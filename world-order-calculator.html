@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    
+    body { 
+      font-family: 'IBM Plex Mono', monospace;
+      max-width: 1200px; 
+      margin: 0 auto; 
+      padding: 20px;
+      background-color: black;
+      color: #fb8b1e;
+      letter-spacing: -0.5px;
+    }
+    h2, h3 { 
+      color: white; 
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .country-container { 
+      margin-bottom: 30px; 
+      padding: 20px; 
+      border: 2px solid #333; 
+      border-radius: 4px;
+      background-color: rgba(51, 51, 51, 0.3);
+    }
+    .factor-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 15px;
+    }
+    .factor-item {
+      background: rgba(51, 51, 51, 0.2);
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #444;
+    }
+    .score-display {
+      font-size: 1em;
+      margin: 10px 0;
+      font-weight: 500;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #fb8b1e;
+    }
+    input[type="text"] {
+      font-family: 'IBM Plex Mono', monospace;
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #fb8b1e;
+      background-color: black;
+      color: #fb8b1e;
+      width: 200px;
+    }
+    .add-country {
+      font-family: 'IBM Plex Mono', monospace;
+      background: #fb8b1e;
+      color: black;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .delete-btn {
+      font-family: 'IBM Plex Mono', monospace;
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .chart-container {
+      background: rgba(51, 51, 51, 0.3);
+      padding: 20px;
+      border-radius: 4px;
+      margin-top: 20px;
+      height: 500px;
+    }
+    strong { 
+      color: white;
+      font-weight: 600;
+    }
+    label {
+      font-size: 0.9em;
+      text-transform: uppercase;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h2>Big Cycle Empire Score Calculator</h2>
+  <button id="addCountry" class="add-country">Add Country</button>
+  <div id="countriesContainer"></div>
+  
+  <div class="chart-container">
+    <h3>Relative Power Distribution</h3>
+    <canvas id="powerChart"></canvas>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+  <script>
+    const factors = [
+      "Education/Competitiveness/Innovation/Technology",
+      "Economic Output",
+      "Share of World Trade",
+      "Military Strength",
+      "Financial Center Strength",
+      "Reserve Currency Status",
+      "Debt Burden",
+      "Internal Order/Disorder",
+      "Wealth/Opportunity/Values Gap",
+      "Internal Conflict",
+      "External Order",
+      "Markets and Financial Center",
+      "Expected Growth",
+      "Civility of the People",
+      "Resource Allocation",
+      "Leadership Strength"
+    ];
+
+    let countries = [];
+    let chart = null;
+
+    function createCountryTemplate(id) {
+      let html = `
+        <div class="country-container" id="country-${id}">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <input type="text" class="country-name" value="Country ${id + 1}">
+            <button class="delete-btn" onclick="deleteCountry(${id})">Delete</button>
+          </div>
+          <div class="factor-group">
+      `;
+
+      factors.forEach((factor, index) => {
+        html += `
+          <div class="factor-item">
+            <label>${factor}</label>
+            <input type="range" 
+              id="factor-${index}-${id}" 
+              class="factor-slider" 
+              min="0" 
+              max="100" 
+              value="50"
+              data-country="${id}"
+              data-factor="${index}">
+            <div class="score-display">
+              Score: <strong id="factor-${index}-${id}-value">0.50</strong>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+          <div class="score-display">
+            Empire Score: <strong id="empire-score-${id}">0.500</strong>
+            Relative Power: <strong id="relative-power-${id}">0.0</strong>%
+          </div>
+        </div>
+      `;
+
+      return html;
+    }
+
+    function initChart() {
+      Chart.defaults.color = '#fb8b1e';
+      Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+      
+      const ctx = document.getElementById('powerChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(54, 162, 235, 0.8)',
+              'rgba(255, 206, 86, 0.8)',
+              'rgba(75, 192, 192, 0.8)',
+              'rgba(153, 102, 255, 0.8)',
+              'rgba(255, 159, 64, 0.8)',
+              'rgba(199, 199, 199, 0.8)',
+              'rgba(83, 102, 255, 0.8)',
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                font: {
+                  family: "'IBM Plex Mono', monospace",
+                  size: 12
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function calculateScores() {
+      let totalEmpireScore = 0;
+      const empireScores = {};
+
+      countries.forEach(countryId => {
+        let countryScore = 0;
+        factors.forEach((factor, index) => {
+          const slider = document.getElementById(`factor-${index}-${countryId}`);
+          const rawScore = slider.value / 100;
+          countryScore += rawScore;
+          
+          document.getElementById(`factor-${index}-${countryId}-value`).textContent = 
+            rawScore.toFixed(2);
+        });
+
+        const avgScore = countryScore / factors.length;
+        empireScores[countryId] = avgScore;
+        totalEmpireScore += avgScore;
+
+        document.getElementById(`empire-score-${countryId}`).textContent = 
+          avgScore.toFixed(3);
+      });
+
+      const chartLabels = [];
+      const chartData = [];
+      
+      countries.forEach(countryId => {
+        const relativePower = (empireScores[countryId] / totalEmpireScore) * 100;
+        const powerValue = relativePower.toFixed(1);
+        document.getElementById(`relative-power-${countryId}`).textContent = powerValue;
+        
+        const name = document.querySelector(`#country-${countryId} .country-name`).value;
+        chartLabels.push(`${name} (${powerValue}%)`);
+        chartData.push(relativePower);
+      });
+
+      chart.data.labels = chartLabels;
+      chart.data.datasets[0].data = chartData;
+      chart.update();
+    }
+
+    function addCountry() {
+      const id = countries.length;
+      if (id < 8) {
+        countries.push(id);
+        document.getElementById('countriesContainer').insertAdjacentHTML('beforeend', createCountryTemplate(id));
+        
+        document.querySelectorAll(`#country-${id} .factor-slider`).forEach(slider => {
+          slider.addEventListener('input', calculateScores);
+        });
+
+        document.querySelector(`#country-${id} .country-name`).addEventListener('input', calculateScores);
+        
+        calculateScores();
+        
+        if (countries.length === 8) {
+          document.getElementById('addCountry').disabled = true;
+        }
+      }
+    }
+
+    function deleteCountry(id) {
+      document.getElementById(`country-${id}`).remove();
+      countries = countries.filter(countryId => countryId !== id);
+      document.getElementById('addCountry').disabled = false;
+      calculateScores();
+    }
+
+    document.getElementById('addCountry').addEventListener('click', addCountry);
+    initChart();
+    addCountry();
+  </script>
+</body>
+</html>
